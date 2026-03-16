@@ -6,7 +6,7 @@
     <title>ESL Review Roulette</title>
     <style>
         :root { --primary: #2c3e50; --gold: #f1c40f; --gray: #95a5a6; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow: hidden; }
         .container { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 600px; padding: 20px; box-sizing: border-box; }
         .panel { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; text-align: center; margin-bottom: 20px; }
         canvas { max-width: 100%; height: auto; }
@@ -50,22 +50,22 @@
     const powerFill = document.getElementById('power-bar-fill');
     
     let score = 0, correct = 0;
-    // FIXED: Corrected the blonde hair question and added unique IDs
-    let questions = [
-        {id: 1, q: "My father's sister is my...", a: "aunt"},
-        {id: 2, q: "I _____ 30 years old.", a: "am"},
-        {id: 3, q: "She _____ blue eyes.", a: "has"},
-        {id: 4, q: "They _____ to eat pizza.", a: "like"},
-        {id: 5, q: "He _____ from Mexico.", a: "is"},
-        {id: 6, q: "My mother's son is my...", a: "brother"},
-        {id: 7, q: "I _____ blonde hair.", a: "have"},
-        {id: 8, q: "He _____ music.", a: "likes"},
-        {id: 9, q: "I work _____ 9:00 to 5:00.", a: "from"},
-        {id: 10, q: "She _____ tall.", a: "is"},
-        {id: 11, q: "We _____ brown eyes.", a: "have"},
-        {id: 12, q: "I am _____ China.", a: "from"},
-        {id: 13, q: "I work from 8:00 _____ 4:00.", a: "to"},
-        {id: 14, q: "My father's father is my...", a: "grandfather"}
+    // FIXED: I ___ from China | am
+    const questions = [
+        {q: "My father's sister is my...", a: "aunt"},
+        {q: "I _____ 30 years old.", a: "am"},
+        {q: "She _____ blue eyes.", a: "has"},
+        {q: "They _____ pizza.", a: "like"},
+        {q: "He _____ from Mexico.", a: "is"},
+        {q: "My mother's son is my...", a: "brother"},
+        {q: "I _____ blonde hair.", a: "have"},
+        {q: "He _____ music.", a: "likes"},
+        {q: "I work _____ 9:00 to 5:00.", a: "from"},
+        {q: "She _____ tall.", a: "is"},
+        {q: "We _____ brown eyes.", a: "have"},
+        {q: "I _____ from China.", a: "am"},
+        {q: "I work from 8:00 _____ 4:00.", a: "to"},
+        {q: "My father's father is my...", a: "grandfather"}
     ];
     
     const slices = 16;
@@ -104,36 +104,31 @@
     function spin(p) { 
         let s = (Math.random()*15) + (p*40); 
         let t = 0; let tt = 4000 + (p*3000); 
+        
+        // Target Logic: Pre-calculate a valid landing spot
+        let validIndices = [];
+        for(let i=0; i<slices; i++){
+            if(sliceStatus[i] === 'active' || i < 2) validIndices.push(i);
+        }
+        
+        // Pick a random valid slice
+        let targetIdx = validIndices[Math.floor(Math.random()*validIndices.length)];
+        
+        // Adjust the spin power to make sure it lands on that targetIdx
+        let finalAngle = (slices - targetIdx) * arc - (arc/2) - (Math.PI/2);
+        let currentRotation = startAngle % (Math.PI*2);
+        let neededRotation = (finalAngle - currentRotation) + (Math.PI*20); // 10 extra loops
+        
         function anim() { 
-            t+=30; if(t>=tt) { stop(); return; } 
-            startAngle += ((s - (t/tt)*s) * Math.PI/180); 
+            t+=30; 
+            if(t>=tt) { stop(targetIdx); return; } 
+            startAngle += (neededRotation / (tt/30)); 
             draw(); requestAnimationFrame(anim); 
         } 
         anim(); 
     }
 
-    function stop() { 
-        let deg = startAngle * 180 / Math.PI + 90; 
-        let idx = Math.floor((360 - (deg % 360)) / (arc * 180 / Math.PI)) % slices; 
-        
-        // FIXED: Improved nudge logic to ensure it NEVER stays on a gray slice
-        if(idx > 1 && sliceStatus[idx] === 'gray'){
-            let searchIdx = idx;
-            let found = false;
-            for(let i=0; i<slices; i++) {
-                let check = (searchIdx + i) % slices;
-                if(check > 1 && sliceStatus[check] === 'active') {
-                    idx = check;
-                    found = true;
-                    break;
-                }
-            }
-            if(!found) {
-                // If everything else is gray, check if Bankrupt/x2 are okay
-                idx = (idx % 2 === 0) ? 0 : 1;
-            }
-        }
-
+    function stop(idx) { 
         if(idx === 0){ alert("Bankrupt! Score is 0."); score=0; } 
         else if(idx === 1){ alert("x2! Points doubled!"); score *= 2; } 
         else { showQ(idx); } 
@@ -142,45 +137,36 @@
 
     function showQ(idx) { 
         window.curIdx = idx; 
-        // FIXED: Pick a random question, but only from the ones left in the list
-        if(questions.length === 0) return;
-        let qIndex = Math.floor(Math.random()*questions.length);
-        let qObj = questions[qIndex];
-        
-        document.getElementById('modal-q').innerText = qObj.q; 
-        window.ans = qObj.a.toLowerCase().trim(); 
-        window.currentQIndex = qIndex; // Store which one to remove later
+        // Always give the question corresponding to the total count
+        let q = questions[correct];
+        document.getElementById('modal-q').innerText = q.q; 
+        window.ans = q.a.toLowerCase().trim(); 
         document.getElementById('modal').style.display='block'; 
         setTimeout(() => document.getElementById('answerInput').focus(), 100);
     }
 
     function checkAnswer() { 
         let a = document.getElementById('answerInput').value.toLowerCase().trim(); 
-        if(a === window.ans){ 
+        if(a===window.ans){ 
             alert("Correct!"); 
-            score += 5; 
+            score+=5; 
             correct++; 
-            sliceStatus[window.curIdx] = 'gray';
-            // REMOVE the question so it doesn't repeat
-            questions.splice(window.currentQIndex, 1);
+            sliceStatus[window.curIdx]='gray'; 
         } else { 
-            alert("Not quite. The answer is: " + window.ans); 
+            alert("Not quite. The answer is: "+window.ans); 
         } 
-        scoreEl.innerText = score; 
-        correctEl.innerText = correct; 
-        document.getElementById('modal').style.display = 'none'; 
-        document.getElementById('answerInput').value = ""; 
+        scoreEl.innerText=score; 
+        correctEl.innerText=correct; 
+        document.getElementById('modal').style.display='none'; 
+        document.getElementById('answerInput').value=""; 
         draw(); 
-        if(correct === 14) alert("✨ Success! You finished all 14 questions! ✨");
+        if(correct === 14) setTimeout(() => alert("✨ Review Complete! Great job! ✨"), 500);
     }
     
     const b = document.getElementById('spinBtn');
     b.onmousedown = b.ontouchstart = (e) => { e.preventDefault(); startCharge(); };
     window.onmouseup = window.ontouchend = releaseCharge;
-    window.onkeydown = (e) => { 
-        if(e.key === "ArrowUp") startCharge(); 
-        if(e.key === "Enter" && document.getElementById('modal').style.display === 'block') checkAnswer(); 
-    };
+    window.onkeydown = (e) => { if(e.key === "ArrowUp") startCharge(); if(e.key === "Enter" && document.getElementById('modal').style.display === 'block') checkAnswer(); };
     window.onkeyup = (e) => { if(e.key === "ArrowUp") releaseCharge(); };
     draw();
 </script>
