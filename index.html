@@ -50,9 +50,6 @@
     const leftEl = document.getElementById('left');
     const powerFill = document.getElementById('power-bar-fill');
     
-    // Winning Sound (Ta-Da)
-    const winSound = new Audio('https://actions.google.com/sounds/v1/foley/drawbridge_clash.ogg'); // This is a placeholder, most browsers require user interaction first.
-
     let score = 0;
     let questions = [
         {q: "My father's sister is my...", a: "aunt", color: "#e74c3c"},
@@ -71,7 +68,7 @@
         {q: "My father's father is my...", a: "grandfather", color: "#16a085"}
     ];
     
-    const specials = [
+    let specials = [
         {q: "BANKRUPT", a: "SPECIAL", color: "black"},
         {q: "x2", a: "SPECIAL", color: "gold"}
     ];
@@ -126,9 +123,20 @@
         let deg = (startAngle * 180 / Math.PI + 90) % 360; 
         let idx = Math.floor((360 - deg) / (360 / numSlices)) % numSlices; 
         let selected = activeSlices[idx];
-        if (selected.q === "BANKRUPT") { alert("Bankrupt!"); score = 0; } 
-        else if (selected.q === "x2") { alert("Double Points!"); score *= 2; } 
-        else { showModal(selected, idx - 2); }
+
+        if (selected.q === "BANKRUPT") { 
+            alert("Bankrupt! Score reset to 0."); score = 0; 
+            specials = specials.filter(s => s.q !== "BANKRUPT"); // REMOVE after use
+        } 
+        else if (selected.q === "x2") { 
+            alert("Double Points!"); score *= 2; 
+            specials = specials.filter(s => s.q !== "x2"); // REMOVE after use
+        } 
+        else { 
+            // Find the real index in the questions array
+            let qIdx = questions.indexOf(selected);
+            showModal(selected, qIdx); 
+        }
         scoreEl.innerText = score;
         draw();
     }
@@ -148,7 +156,7 @@
             score += 10;
             questions.splice(window.currentQIdx, 1);
         } else {
-            alert("The answer was: " + window.currentQ.a);
+            alert("Incorrect. The answer was: " + window.currentQ.a);
         }
         document.getElementById('modal').style.display = 'none';
         document.getElementById('answerInput').value = "";
@@ -157,7 +165,6 @@
         draw();
         if (questions.length === 0) {
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-            // Browser sound policy: needs a click. The "Submit" button click works!
             const finalSound = new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_062564a5f5.mp3');
             finalSound.play();
             setTimeout(() => alert("Great job!"), 500);
