@@ -50,12 +50,11 @@
     const powerFill = document.getElementById('power-bar-fill');
     
     let score = 0, correct = 0;
-    // FIXED: I ___ from China | am
     const questions = [
         {q: "My father's sister is my...", a: "aunt"},
         {q: "I _____ 30 years old.", a: "am"},
         {q: "She _____ blue eyes.", a: "has"},
-        {q: "They _____ pizza.", a: "like"},
+        {q: "They _____ to eat pizza.", a: "like"},
         {q: "He _____ from Mexico.", a: "is"},
         {q: "My mother's son is my...", a: "brother"},
         {q: "I _____ blonde hair.", a: "have"},
@@ -102,30 +101,42 @@
     function releaseCharge() { if(!isCharging) return; isCharging = false; let p = Math.min((Date.now()-chargeStart)/1500, 1); powerFill.style.width = "0%"; spin(p); }
     
     function spin(p) { 
-        let s = (Math.random()*15) + (p*40); 
-        let t = 0; let tt = 4000 + (p*3000); 
-        
-        // Target Logic: Pre-calculate a valid landing spot
         let validIndices = [];
         for(let i=0; i<slices; i++){
             if(sliceStatus[i] === 'active' || i < 2) validIndices.push(i);
         }
-        
-        // Pick a random valid slice
+        if (validIndices.length <= 2 && validIndices.includes(0) && validIndices.includes(1)) {
+            // Only Bankrupt and x2 left
+        } else if (validIndices.length > 2) {
+            // Remove Bankrupt and x2 from random selection if questions are left to avoid frustration
+            validIndices = validIndices.filter(idx => idx > 1);
+        }
+
         let targetIdx = validIndices[Math.floor(Math.random()*validIndices.length)];
+        let totalSlicesToSpin = (slices * 5) + (slices - targetIdx); 
+        let targetRotation = totalSlicesToSpin * arc;
         
-        // Adjust the spin power to make sure it lands on that targetIdx
-        let finalAngle = (slices - targetIdx) * arc - (arc/2) - (Math.PI/2);
-        let currentRotation = startAngle % (Math.PI*2);
-        let neededRotation = (finalAngle - currentRotation) + (Math.PI*20); // 10 extra loops
-        
-        function anim() { 
-            t+=30; 
-            if(t>=tt) { stop(targetIdx); return; } 
-            startAngle += (neededRotation / (tt/30)); 
-            draw(); requestAnimationFrame(anim); 
-        } 
-        anim(); 
+        let startTime = null;
+        let duration = 4000 + (p * 2000);
+        let initialAngle = startAngle;
+
+        function animate(timestamp) {
+            if (!startTime) startTime = timestamp;
+            let elapsed = timestamp - startTime;
+            let progress = Math.min(elapsed / duration, 1);
+            
+            // Ease out cubic function for smooth stopping
+            let easeOut = 1 - Math.pow(1 - progress, 3);
+            startAngle = initialAngle + (targetRotation * easeOut);
+            
+            draw();
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                stop(targetIdx);
+            }
+        }
+        requestAnimationFrame(animate);
     }
 
     function stop(idx) { 
@@ -137,7 +148,6 @@
 
     function showQ(idx) { 
         window.curIdx = idx; 
-        // Always give the question corresponding to the total count
         let q = questions[correct];
         document.getElementById('modal-q').innerText = q.q; 
         window.ans = q.a.toLowerCase().trim(); 
