@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESL Review Roulette</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         :root { --primary: #2c3e50; --gold: #f1c40f; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow: hidden; }
         .container { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 600px; padding: 20px; box-sizing: border-box; }
         .panel { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; text-align: center; margin-bottom: 20px; }
-        canvas { max-width: 100%; height: auto; }
+        canvas#canvas { max-width: 100%; height: auto; }
         .power-bar-bg { width: 80%; height: 20px; background: #eee; border-radius: 10px; margin: 20px auto; overflow: hidden; border: 1px solid #ddd; }
         #power-bar-fill { width: 0%; height: 100%; background: linear-gradient(to right, #2ecc71, #f1c40f, #e74c3c); transition: width 0.1s; }
         .btn-spin { padding: 15px 40px; font-size: 1.2rem; font-weight: bold; background: var(--primary); color: white; border: none; border-radius: 30px; cursor: pointer; width: 80%; box-shadow: 0 4px #1a252f; }
@@ -29,7 +30,7 @@
         <button class="btn-spin" id="spinBtn">HOLD TO CHARGE</button>
         <div class="stats">
             <p>Score: <b id="score" style="color: #27ae60;">0</b></p>
-            <p>Left: <b id="left">14</b></p>
+            <p>Questions Left: <b id="left">14</b></p>
         </div>
         <button onclick="location.reload()" style="margin-top:15px; background:none; border:none; color:#95a5a6; cursor:pointer; text-decoration: underline;">Reset Game</button>
     </div>
@@ -49,6 +50,9 @@
     const leftEl = document.getElementById('left');
     const powerFill = document.getElementById('power-bar-fill');
     
+    // Winning Sound (Ta-Da)
+    const winSound = new Audio('https://actions.google.com/sounds/v1/foley/drawbridge_clash.ogg'); // This is a placeholder, most browsers require user interaction first.
+
     let score = 0;
     let questions = [
         {q: "My father's sister is my...", a: "aunt", color: "#e74c3c"},
@@ -67,7 +71,6 @@
         {q: "My father's father is my...", a: "grandfather", color: "#16a085"}
     ];
     
-    // Always keep Bankrupt and x2
     const specials = [
         {q: "BANKRUPT", a: "SPECIAL", color: "black"},
         {q: "x2", a: "SPECIAL", color: "gold"}
@@ -85,15 +88,12 @@
         const activeSlices = getActiveSlices();
         const numSlices = activeSlices.length;
         const arc = (Math.PI * 2) / numSlices;
-        
         ctx.clearRect(0,0,500,500);
         ctx.font = "bold 16px Arial";
-        
         activeSlices.forEach((slice, i) => {
             const angle = startAngle + i * arc;
             ctx.fillStyle = slice.color;
             ctx.beginPath(); ctx.moveTo(250,250); ctx.arc(250,250,230,angle,angle+arc); ctx.fill();
-            
             ctx.save();
             ctx.translate(250+Math.cos(angle+arc/2)*170, 250+Math.sin(angle+arc/2)*170);
             ctx.rotate(angle+arc/2+Math.PI/2);
@@ -102,7 +102,6 @@
             ctx.fillText(text, -ctx.measureText(text).width/2, 0);
             ctx.restore();
         });
-        
         ctx.fillStyle = "#e74c3c"; ctx.beginPath(); ctx.moveTo(230,15); ctx.lineTo(270,15); ctx.lineTo(250,50); ctx.fill();
     }
 
@@ -124,17 +123,51 @@
     function finalize() { 
         const activeSlices = getActiveSlices();
         const numSlices = activeSlices.length;
-        const arcDegrees = 360 / numSlices;
         let deg = (startAngle * 180 / Math.PI + 90) % 360; 
-        let idx = Math.floor((360 - deg) / arcDegrees) % numSlices; 
-        
+        let idx = Math.floor((360 - deg) / (360 / numSlices)) % numSlices; 
         let selected = activeSlices[idx];
-        
-        if (selected.q === "BANKRUPT") {
-            alert("Bankrupt! Score is 0."); score = 0;
-        } else if (selected.q === "x2") {
-            alert("Double Points!"); score *= 2;
+        if (selected.q === "BANKRUPT") { alert("Bankrupt!"); score = 0; } 
+        else if (selected.q === "x2") { alert("Double Points!"); score *= 2; } 
+        else { showModal(selected, idx - 2); }
+        scoreEl.innerText = score;
+        draw();
+    }
+
+    function showModal(qObj, realIdx) {
+        window.currentQ = qObj;
+        window.currentQIdx = realIdx;
+        document.getElementById('modal-q').innerText = qObj.q;
+        document.getElementById('modal').style.display = 'block';
+        setTimeout(() => document.getElementById('answerInput').focus(), 100);
+    }
+
+    function checkAnswer() {
+        let val = document.getElementById('answerInput').value.toLowerCase().trim();
+        if (val === window.currentQ.a) {
+            alert("Correct!");
+            score += 10;
+            questions.splice(window.currentQIdx, 1);
         } else {
-            showModal(selected, idx - 2); // -2 because specials are first in activeSlices
+            alert("The answer was: " + window.currentQ.a);
         }
-        scoreEl.innerText = score
+        document.getElementById('modal').style.display = 'none';
+        document.getElementById('answerInput').value = "";
+        scoreEl.innerText = score;
+        leftEl.innerText = questions.length;
+        draw();
+        if (questions.length === 0) {
+            confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            // Browser sound policy: needs a click. The "Submit" button click works!
+            const finalSound = new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_062564a5f5.mp3');
+            finalSound.play();
+            setTimeout(() => alert("Great job!"), 500);
+        }
+    }
+
+    const b = document.getElementById('spinBtn');
+    b.onmousedown = b.ontouchstart = (e) => { e.preventDefault(); startCharge(); };
+    window.onmouseup = window.ontouchend = releaseCharge;
+    draw();
+</script>
+</body>
+</html>
