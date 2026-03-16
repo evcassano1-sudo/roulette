@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESL Review Roulette</title>
+    <style>
+        :root { --primary: #2c3e50; --gold: #f1c40f; --gray: #95a5a6; }
+        body { font-family: sans-serif; margin: 0; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .container { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 600px; padding: 20px; box-sizing: border-box; }
+        .panel { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; text-align: center; margin-bottom: 20px; }
+        canvas { max-width: 100%; height: auto; }
+        .power-bar-bg { width: 80%; height: 20px; background: #eee; border-radius: 10px; margin: 20px auto; overflow: hidden; }
+        #power-bar-fill { width: 0%; height: 100%; background: linear-gradient(to right, #2ecc71, #e74c3c); transition: width 0.1s; }
+        .btn-spin { padding: 15px 40px; font-size: 1.2rem; background: var(--primary); color: white; border: none; border-radius: 30px; cursor: pointer; width: 80%; }
+        .stats { display: flex; justify-content: space-around; width: 100%; margin-top: 10px; font-weight: bold; }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 15px; box-shadow: 0 0 40px rgba(0,0,0,0.3); z-index: 100; text-align: center; width: 90%; max-width: 400px; }
+        input[type="text"] { padding: 10px; width: 80%; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="panel">
+        <h2 style="margin-top:0">ESL Class Review</h2>
+        <canvas id="canvas" width="500" height="500"></canvas>
+        <div class="power-bar-bg"><div id="power-bar-fill"></div></div>
+        <button class="btn-spin" id="spinBtn">HOLD TO SPIN</button>
+        <div class="stats">
+            <p>Score: <span id="score">0</span></p>
+            <p>Done: <span id="correct">0</span>/14</p>
+        </div>
+        <button onclick="location.reload()" style="margin-top:10px; background:none; border:none; color:gray; cursor:pointer;">Reset Game</button>
+    </div>
+</div>
+
+<div id="modal" class="modal">
+    <h3 id="modal-q">Question</h3>
+    <input type="text" id="answerInput" placeholder="Your answer..." autocomplete="off">
+    <br><br>
+    <button onclick="checkAnswer()" class="btn-spin" style="padding: 10px 30px;">Submit</button>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const correctEl = document.getElementById('correct');
+    const powerFill = document.getElementById('power-bar-fill');
+    
+    let score = 0, correct = 0;
+    // YOUR QUESTIONS BUILT-IN:
+    const questions = [
+        {q: "My father's sister is my...", a: "aunt"},
+        {q: "I am 30 _____ old.", a: "years"},
+        {q: "She _____ blue eyes.", a: "has"},
+        {q: "They _____ to eat pizza.", a: "like"},
+        {q: "He _____ from Mexico.", a: "is"},
+        {q: "My mother's son is my...", a: "brother"},
+        {q: "I have blonde _____. | hair", a: "hair"},
+        {q: "He _____ orange juice.", a: "likes"},
+        {q: "I work _____ 9:00 to 5:00.", a: "from"},
+        {q: "She is not short. She is _____. | tall", a: "tall"},
+        {q: "We _____ brown eyes.", a: "have"},
+        {q: "I am _____ China.", a: "from"},
+        {q: "I work from 8:00 _____ 4:00.", a: "to"},
+        {q: "My father's father is my...", a: "grandfather"}
+    ];
+    
+    const slices = 16;
+    const arc = Math.PI / (slices / 2);
+    let startAngle = 0;
+    let isCharging = false;
+    let chargeStart = 0;
+    let sliceStatus = Array(16).fill('active');
+    const colors = ["#e74c3c", "#3498db", "#2ecc71", "#f1c40f", "#9b59b6", "#1abc9c", "#e67e22", "#d35400", "#c0392b", "#27ae60", "#2980b9", "#8e44ad", "#16a085", "#ff9ff3"];
+
+    function draw() {
+        ctx.clearRect(0,0,500,500);
+        for(let i=0; i<slices; i++) {
+            const angle = startAngle + i * arc;
+            ctx.fillStyle = (i===0) ? "black" : (i===1) ? "gold" : (sliceStatus[i]==='gray' ? "#95a5a6" : colors[i-2]);
+            ctx.beginPath(); ctx.moveTo(250,250); ctx.arc(250,250,230,angle,angle+arc); ctx.fill();
+            ctx.save();
+            ctx.translate(250+Math.cos(angle+arc/2)*180, 250+Math.sin(angle+arc/2)*180);
+            ctx.rotate(angle+arc/2+Math.PI/2);
+            ctx.fillStyle = (i===0) ? "white" : "black";
+            ctx.fillText((i===0)?"BANKRUPT":(i===1)?"x2":(sliceStatus[i]==='gray'?"✔":"?"), 0,0);
+            ctx.restore();
+        }
+        ctx.fillStyle = "red"; ctx.beginPath(); ctx.moveTo(235,10); ctx.lineTo(265,10); ctx.lineTo(250,40); ctx.fill();
+    }
+
+    function startCharge() { isCharging = true; chargeStart = Date.now(); requestAnimationFrame(updateBar); }
+    function updateBar() { if(!isCharging) return; let p = Math.min((Date.now()-chargeStart)/2000, 1); powerFill.style.width = (p*100)+"%"; requestAnimationFrame(updateBar); }
+    function releaseCharge() { if(!isCharging) return; isCharging = false; let p = Math.min((Date.now()-chargeStart)/2000, 1); powerFill.style.width = "0%"; spin(p); }
+    function spin(p) { let s = Math.random()*10 + p*30; let t = 0; let tt = 3000 + p*4000; function anim() { t+=30; if(t>=tt) { stop(); return; } startAngle += ((s - (t/tt)*s) * Math.PI/180); draw(); requestAnimationFrame(anim); } anim(); }
+    function stop() { let deg = startAngle*180/Math.PI+90; let idx = Math.floor((360-(deg%360))/(arc*180/Math.PI))%slices; if(idx===0){ alert("Bankrupt!"); score=0; } else if(idx===1){ alert("x2!"); score*=2; } else if(sliceStatus[idx]==='gray'){ alert("Try again!"); } else { showQ(idx); } scoreEl.innerText = score; draw(); }
+    function showQ(idx) { window.curIdx = idx; let q = questions[Math.floor(Math.random()*questions.length)]; document.getElementById('modal-q').innerText = q.q; window.ans = q.a.toLowerCase().trim(); document.getElementById('modal').style.display='block'; }
+    function checkAnswer() { let a = document.getElementById('answerInput').value.toLowerCase().trim(); if(a===window.ans){ alert("Correct!"); score+=5; correct++; sliceStatus[window.curIdx]='gray'; } else { alert("Answer: "+window.ans); } scoreEl.innerText=score; correctEl.innerText=correct; document.getElementById('modal').style.display='none'; document.getElementById('answerInput').value=""; draw(); }
+    
+    const b = document.getElementById('spinBtn');
+    b.onmousedown = b.ontouchstart = (e) => { e.preventDefault(); startCharge(); };
+    window.onmouseup = window.ontouchend = releaseCharge;
+    draw();
+</script>
+</body>
+</html>
