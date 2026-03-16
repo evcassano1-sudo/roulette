@@ -50,21 +50,22 @@
     const powerFill = document.getElementById('power-bar-fill');
     
     let score = 0, correct = 0;
-    const questions = [
-        {q: "My father's sister is my...", a: "aunt"},
-        {q: "I _____ 30 years old.", a: "am"},
-        {q: "She _____ blue eyes.", a: "has"},
-        {q: "They _____ to eat pizza.", a: "like"},
-        {q: "He _____ from Mexico.", a: "is"},
-        {q: "My mother's son is my...", a: "brother"},
-        {q: "I have blonde _____. ", a: "hair"},
-        {q: "He _____ music.", a: "likes"},
-        {q: "I work _____ 9:00 to 5:00.", a: "from"},
-        {q: "She _____ tall.", a: "is"},
-        {q: "We _____ brown eyes.", a: "have"},
-        {q: "I am _____ China.", a: "from"},
-        {q: "I work from 8:00 _____ 4:00.", a: "to"},
-        {q: "My father's father is my...", a: "grandfather"}
+    // FIXED: Corrected the blonde hair question and added unique IDs
+    let questions = [
+        {id: 1, q: "My father's sister is my...", a: "aunt"},
+        {id: 2, q: "I _____ 30 years old.", a: "am"},
+        {id: 3, q: "She _____ blue eyes.", a: "has"},
+        {id: 4, q: "They _____ to eat pizza.", a: "like"},
+        {id: 5, q: "He _____ from Mexico.", a: "is"},
+        {id: 6, q: "My mother's son is my...", a: "brother"},
+        {id: 7, q: "I _____ blonde hair.", a: "have"},
+        {id: 8, q: "He _____ music.", a: "likes"},
+        {id: 9, q: "I work _____ 9:00 to 5:00.", a: "from"},
+        {id: 10, q: "She _____ tall.", a: "is"},
+        {id: 11, q: "We _____ brown eyes.", a: "have"},
+        {id: 12, q: "I am _____ China.", a: "from"},
+        {id: 13, q: "I work from 8:00 _____ 4:00.", a: "to"},
+        {id: 14, q: "My father's father is my...", a: "grandfather"}
     ];
     
     const slices = 16;
@@ -112,51 +113,74 @@
     }
 
     function stop() { 
-        let deg = startAngle*180/Math.PI+90; 
-        let idx = Math.floor((360-(deg%360))/(arc*180/Math.PI))%slices; 
+        let deg = startAngle * 180 / Math.PI + 90; 
+        let idx = Math.floor((360 - (deg % 360)) / (arc * 180 / Math.PI)) % slices; 
         
-        // NEW LOGIC: If we land on a gray slice, find the next active one clockwise
+        // FIXED: Improved nudge logic to ensure it NEVER stays on a gray slice
         if(idx > 1 && sliceStatus[idx] === 'gray'){
-            let originalIdx = idx;
-            while(sliceStatus[idx] === 'gray'){
-                idx = (idx + 1) % slices;
-                if(idx < 2) idx = 2; // Don't snap to Bankrupt or x2 automatically
-                if(idx === originalIdx) break; // Should not happen if game is not over
+            let searchIdx = idx;
+            let found = false;
+            for(let i=0; i<slices; i++) {
+                let check = (searchIdx + i) % slices;
+                if(check > 1 && sliceStatus[check] === 'active') {
+                    idx = check;
+                    found = true;
+                    break;
+                }
+            }
+            if(!found) {
+                // If everything else is gray, check if Bankrupt/x2 are okay
+                idx = (idx % 2 === 0) ? 0 : 1;
             }
         }
 
-        if(idx === 0){ alert("Bankrupt! Your points are back to 0."); score=0; } 
-        else if(idx === 1){ alert("x2! Your points doubled!"); score *= 2; } 
+        if(idx === 0){ alert("Bankrupt! Score is 0."); score=0; } 
+        else if(idx === 1){ alert("x2! Points doubled!"); score *= 2; } 
         else { showQ(idx); } 
         scoreEl.innerText = score; draw(); 
     }
 
     function showQ(idx) { 
         window.curIdx = idx; 
-        let q = questions[Math.floor(Math.random()*questions.length)]; 
-        document.getElementById('modal-q').innerText = q.q; 
-        window.ans = q.a.toLowerCase().trim(); 
+        // FIXED: Pick a random question, but only from the ones left in the list
+        if(questions.length === 0) return;
+        let qIndex = Math.floor(Math.random()*questions.length);
+        let qObj = questions[qIndex];
+        
+        document.getElementById('modal-q').innerText = qObj.q; 
+        window.ans = qObj.a.toLowerCase().trim(); 
+        window.currentQIndex = qIndex; // Store which one to remove later
         document.getElementById('modal').style.display='block'; 
         setTimeout(() => document.getElementById('answerInput').focus(), 100);
     }
 
     function checkAnswer() { 
         let a = document.getElementById('answerInput').value.toLowerCase().trim(); 
-        if(a===window.ans){ alert("Correct!"); score+=5; correct++; sliceStatus[window.curIdx]='gray'; } 
-        else { alert("Incorrect. The answer is: "+window.ans); } 
-        scoreEl.innerText=score; correctEl.innerText=correct; 
-        document.getElementById('modal').style.display='none'; 
-        document.getElementById('answerInput').value=""; 
+        if(a === window.ans){ 
+            alert("Correct!"); 
+            score += 5; 
+            correct++; 
+            sliceStatus[window.curIdx] = 'gray';
+            // REMOVE the question so it doesn't repeat
+            questions.splice(window.currentQIndex, 1);
+        } else { 
+            alert("Not quite. The answer is: " + window.ans); 
+        } 
+        scoreEl.innerText = score; 
+        correctEl.innerText = correct; 
+        document.getElementById('modal').style.display = 'none'; 
+        document.getElementById('answerInput').value = ""; 
         draw(); 
-        if(correct === 14) {
-            setTimeout(() => alert("✨ Great job! You finished the game! ✨"), 500);
-        }
+        if(correct === 14) alert("✨ Success! You finished all 14 questions! ✨");
     }
     
     const b = document.getElementById('spinBtn');
     b.onmousedown = b.ontouchstart = (e) => { e.preventDefault(); startCharge(); };
     window.onmouseup = window.ontouchend = releaseCharge;
-    window.onkeydown = (e) => { if(e.key === "ArrowUp") startCharge(); if(e.key === "Enter" && document.getElementById('modal').style.display === 'block') checkAnswer(); };
+    window.onkeydown = (e) => { 
+        if(e.key === "ArrowUp") startCharge(); 
+        if(e.key === "Enter" && document.getElementById('modal').style.display === 'block') checkAnswer(); 
+    };
     window.onkeyup = (e) => { if(e.key === "ArrowUp") releaseCharge(); };
     draw();
 </script>
