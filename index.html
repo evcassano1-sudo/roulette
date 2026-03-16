@@ -6,7 +6,7 @@
     <title>ESL Review Roulette</title>
     <style>
         :root { --primary: #2c3e50; --gold: #f1c40f; --gray: #95a5a6; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; min-height: 100vh; overflow-x: hidden; }
         .container { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 600px; padding: 20px; box-sizing: border-box; }
         .panel { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; text-align: center; margin-bottom: 20px; }
         canvas { max-width: 100%; height: auto; }
@@ -114,9 +114,19 @@
     function stop() { 
         let deg = startAngle*180/Math.PI+90; 
         let idx = Math.floor((360-(deg%360))/(arc*180/Math.PI))%slices; 
-        if(idx===0){ alert("Bankrupt! Your points are back to 0."); score=0; } 
-        else if(idx===1){ alert("x2! Your points doubled!"); score *= 2; } 
-        else if(sliceStatus[idx]==='gray'){ alert("Already finished! Spin again."); } 
+        
+        // NEW LOGIC: If we land on a gray slice, find the next active one clockwise
+        if(idx > 1 && sliceStatus[idx] === 'gray'){
+            let originalIdx = idx;
+            while(sliceStatus[idx] === 'gray'){
+                idx = (idx + 1) % slices;
+                if(idx < 2) idx = 2; // Don't snap to Bankrupt or x2 automatically
+                if(idx === originalIdx) break; // Should not happen if game is not over
+            }
+        }
+
+        if(idx === 0){ alert("Bankrupt! Your points are back to 0."); score=0; } 
+        else if(idx === 1){ alert("x2! Your points doubled!"); score *= 2; } 
         else { showQ(idx); } 
         scoreEl.innerText = score; draw(); 
     }
@@ -138,7 +148,9 @@
         document.getElementById('modal').style.display='none'; 
         document.getElementById('answerInput').value=""; 
         draw(); 
-        if(correct === 14) alert("Great job! You finished the game!");
+        if(correct === 14) {
+            setTimeout(() => alert("✨ Great job! You finished the game! ✨"), 500);
+        }
     }
     
     const b = document.getElementById('spinBtn');
